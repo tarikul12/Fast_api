@@ -89,7 +89,6 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from typing import Optional
 from uuid import uuid4
-
 app = FastAPI()
 
 # Password hashing context
@@ -130,9 +129,13 @@ def authenticate_user(username: str, password: str):
         return False
     return user
 
-@app.get("/base")
-async def base(request: Request):
-    return templates.TemplateResponse("base.html", {"request": request})
+@app.get("/about")
+async def about(request: Request):
+    return templates.TemplateResponse("about.html", {"request": request})
+
+@app.get("/home")
+async def home(request: Request):
+    return templates.TemplateResponse("home.html", {"request": request})
 
 @app.get("/register")
 async def register_form(request: Request):
@@ -149,7 +152,7 @@ async def register_user(request: Request, username: str = Form(...), email: str 
     return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 @app.get("/login")
-async def login_form(request: Request):
+async def login_form(request: Request,user =None):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login")
@@ -160,7 +163,7 @@ async def login_user(request: Request, username: str = Form(...), password: str 
     
     session_id = str(uuid4())
     sessions[session_id] = user.username
-    response = RedirectResponse(url="/profile", status_code=status.HTTP_302_FOUND)
+    response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
     response.set_cookie(key="session_id", value=session_id)
     return response
 
@@ -177,6 +180,38 @@ async def profile(request: Request):
     if not current_user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse("profile.html", {"request": request, "user": current_user})
+
+@app.get("/profile/edit")
+async def edit_profile(request: Request):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse("edit_profile.html", {"request": request, "user": current_user})
+
+@app.post("/profile/edit")
+async def update_profile(request: Request, username: str = Form(...), email: str = Form(...)):
+    current_user = get_current_user(request)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    
+    # Update user details using attribute assignment
+    current_user.username = username
+    current_user.email = email
+    
+    # Save the updated user to the database if needed
+    # For example, if you are using an ORM like SQLAlchemy, you might need to commit the changes:
+    # db_session.add(current_user)
+    # db_session.commit()
+    
+    # Redirect to the profile page after update
+    return RedirectResponse(url="/profile", status_code=status.HTTP_302_FOUND)
+
+
+
+@app.get("/dashboard")
+async def dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
 
 @app.get("/logout")
 async def logout(request: Request):

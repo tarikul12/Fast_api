@@ -1,0 +1,26 @@
+#sidebar-wrapper {
+    min-width: 250px;
+    max-width: 250px;
+    height: 100vh;
+    position: sticky;
+    transition: all 0.3s;
+}
+
+#page-content-wrapper {
+    width: 100%;
+    padding-left: 250px;
+    transition: all 0.3s;
+}
+
+#menu-toggle {
+    margin-top: 10px;
+}
+
+/* Toggle Sidebar - Collapse */
+.toggled #sidebar-wrapper {
+    margin-left: -250px;
+}
+
+.toggled #page-content-wrapper {
+    padding-left: 0;
+}

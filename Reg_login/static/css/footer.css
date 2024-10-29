@@ -1,0 +1,43 @@
+.footer {
+    background-color: #222; /* Dark background */
+    color: #bbb;
+}
+
+.footer .sitename {
+    font-size: 1.8em;
+    color: #fff;
+    font-weight: bold;
+}
+
+.footer p {
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 1.1em;
+    line-height: 1.5;
+}
+
+.footer .social-links a {
+    color: #bbb;
+    font-size: 1.4em;
+    transition: color 0.3s ease;
+}
+
+.footer .social-links a:hover {
+    color: #00aced; /* Highlight color on hover */
+}
+
+.footer .copyright {
+    font-size: 0.9em;
+    color: #888;
+}
+
+.footer .credits a {
+    color: #bbb;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.footer .credits a:hover {
+    color: #00aced; /* Link highlight color */
+    text-decoration: underline;
+}
