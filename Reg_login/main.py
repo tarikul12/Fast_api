@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse,HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import Column, Integer, String, create_engine
@@ -13,21 +13,29 @@ import os
 from starlette.middleware.sessions import SessionMiddleware
 from database import get_db
 from models import User
-
+from database import engine
+from models import Base
+from datetime import datetime
+from fastapi import FastAPI, Depends, HTTPException, Form
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 
 # Initialize FastAPI app
 app = FastAPI()
 
 secret_key = os.getenv("SECRET_KEY", "fallback_dev_key_for_local")
 app.add_middleware(SessionMiddleware, secret_key="secret_key")
-
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+Base.metadata.create_all(bind=engine)
 
 # Templates and Static Files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 def verify_password(plain_password, hashed_password):
@@ -38,6 +46,7 @@ def hash_password(password: str) -> str:
 
 def get_user(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
+
 
 def authenticate_user(db: Session, username: str, password: str):
     user = get_user(db, username)
@@ -58,14 +67,50 @@ async def register_form(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
 @app.post("/register")
-async def register_user(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+async def register_user(
+    request: Request, 
+    username: str = Form(...), 
+    email: str = Form(...), 
+    password: str = Form(...),
+    cgpa: str = Form(...),
+    program: str = Form(...),
+    address: str = Form(...),
+    sex: str = Form(...),
+    blood: str = Form(...),
+    birth_date: str = Form(...),  # Still accepting as string
+    phone: str = Form(...), 
+    db: Session = Depends(get_db)
+):
+    # Check if username already exists
     if get_user(db, username):
         return templates.TemplateResponse("register.html", {"request": request, "error": "Username already registered"})
     
+    # Hash the password
     hashed_password = get_password_hash(password)
-    new_user = User(username=username, email=email, hashed_password=hashed_password)
+    
+    # Convert birth_date string to a date object
+    try:
+        birth_date = datetime.strptime(birth_date, "%Y-%m-%d").date()
+    except ValueError:
+        return templates.TemplateResponse("register.html", {"request": request, "error": "Invalid birth date format. Use YYYY-MM-DD."})
+
+    # Create the new user
+    new_user = User(
+        username=username, 
+        email=email, 
+        hashed_password=hashed_password, 
+        cgpa=cgpa, 
+        program=program, 
+        address=address, 
+        sex=sex, 
+        blood=blood, 
+        birth_date=birth_date, 
+        phone=phone
+    )
     db.add(new_user)
     db.commit()
+    
+    # Redirect to login
     return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 @app.get("/login")
@@ -88,10 +133,36 @@ async def login(request: Request, db: Session = Depends(get_db)):
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     session_id = request.session.get("session_id")
-    if not session_id:
+    if "username" not in request.session:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     users = db.query(User).all()
-    return templates.TemplateResponse("dashboard.html", {"request": request, "users": users})
+    total_count = db.query(User).count()
+    cgpa_count = db.query(User.cgpa).distinct().count()
+    email_count = db.query(User.email).distinct().count()
+    program_count = db.query(User.program).distinct().count()
+    sex_count = db.query(User.sex).distinct().count()
+    blood_count = db.query(User.blood).distinct().count()
+    
+    #sex graph show
+    male_count = db.query(User).filter(User.sex == 'male').count()
+    female_count = db.query(User).filter(User.sex == 'female').count()
+    
+    #blood graph show
+    blood_counts = {
+        "A+": db.query(User).filter(User.blood == 'A+').count(),
+        "A-": db.query(User).filter(User.blood == 'A-').count(),
+        "B+": db.query(User).filter(User.blood == 'B+').count(),
+        "B-": db.query(User).filter(User.blood == 'B-').count(),
+        "O+": db.query(User).filter(User.blood == 'O+').count(),
+        "O-": db.query(User).filter(User.blood == 'O-').count(),
+        "AB+": db.query(User).filter(User.blood == 'AB+').count(),
+        "AB-": db.query(User).filter(User.blood == 'AB-').count(),
+    }
+
+
+    return templates.TemplateResponse("dashboard.html", {"request": request, "users": users, "total_count": total_count,"cgpa_count":cgpa_count,"sex_count":sex_count,"blood_count":blood_count,"email_count":email_count,
+                                                          "male_count": male_count,
+        "female_count": female_count,"program_count":program_count,"blood_counts": blood_counts})
 
 @app.get('/all_user')
 async def all_user(request: Request, db: Session = Depends(get_db)):
@@ -129,20 +200,26 @@ async def profile(request: Request, db: Session = Depends(get_db)):
 async def edit_profile(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
     if not current_user:
-        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url="/login", status_code=302)
     return templates.TemplateResponse("edit_profile.html", {"request": request, "current_user": current_user})
 
+@app.post("/profile/update/{user_id}")
+async def update_user(user_id: int, username: str = Form(...), email: str = Form(...), db: Session = Depends(get_db)):
+    retries = 3
+    for attempt in range(retries):
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
 
-@app.post("/profile/edit")
-async def update_profile(request: Request, username: str = Form(...), email: str = Form(...), db: Session = Depends(get_db)):
-    current_user = get_current_user(request, db)
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+            # Update user details
+            user.username = username
+            user.email = email
+            db.commit()  # Save the changes
+            return {"message": "User updated successfully"}
+        except OperationalError:
+            if attempt < retries - 1:
+                time.sleep(1)  # Wait a second before retrying
+            else:
+                raise HTTPException(status_code=500, detail="Database is currently busy. Please try again later.")
 
-    # Update user details
-    current_user.username = username
-    current_user.email = email
-    db.commit()  # Save the changes
-
-    # Redirect to the profile page after update
-    return RedirectResponse(url="/profile", status_code=status.HTTP_302_FOUND)

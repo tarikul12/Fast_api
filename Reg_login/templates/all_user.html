@@ -19,6 +19,13 @@
         <th>id</th>
         <th>Username</th>
         <th>Email</th>
+        <th>CGPA</th>
+        <th>Program</th>
+        <th>Address</th>
+        <th>Sex</th>
+        <th>Blood Group</th>
+        <th>Birth Date</th>
+        <th>Phone Number</th>
       </tr>
     </thead>
     <tbody>
@@ -27,6 +34,13 @@
         <td>{{ user.id }}</td>
         <td>{{ user.username }}</td>
         <td>{{ user.email }}</td>
+        <td>{{ user.cgpa }}</td>
+        <td>{{ user.program }}</td>
+        <td>{{ user.address }}</td>
+        <td>{{ user.sex }}</td>
+        <td>{{ user.blood }}</td>
+        <td>{{ user.birth_date }}</td>
+        <td>{{ user.phone }}</td>
       </tr>
       {% endfor %}
     </tbody>

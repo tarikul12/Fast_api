@@ -4,16 +4,13 @@
   <div class="content">
     <div class="form-container">
       <h1>Edit Profile</h1>
-      <form method="post" action="/profile/edit">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" value="{{ current_user.username }}" required>
-  
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" value="{{ current_user.email }}" required>
-  
-          <button type="submit">Save Changes</button>
-      </form>
+      <form action="/profile/update/{{ current_user.id }}" method="POST">
+          <input type="text" name="username" value="{{ current_user.username }}" required>
+          <input type="email" name="email" value="{{ current_user.email }}" required>
+          <button type="submit">Update Profile</button>
+      </form>    
   </div>
+  
   
   </div>
 

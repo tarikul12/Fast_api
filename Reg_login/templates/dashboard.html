@@ -1,6 +1,206 @@
 {% include 'dashboard_sidebar.html' %} {% block content %}
-
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <div class="content">
-<h1>Hello</h1>
+    <div class="container py-5">
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            <!-- Card 1 -->
+            <div class="col">
+                <div class="card h-100 shadow-lg border-0 rounded-4">
+                    <div class="card-body text-center">
+                        <a href="#" class="d-block mb-3">
+                            <i class="fa-regular fa-user-circle fa-3x text-secondary"></i>
+                        </a>
+                        <p class="card-text display-6 fw-bold">{{ total_count }}</p>
+                        <button type="button" class="btn btn-info btn-lg mt-2">USER</button>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- Card 2 -->
+            <div class="col">
+                <div class="card h-100 shadow-lg border-0 rounded-4">
+                    <div class="card-body text-center">
+                        <a href="#" class="d-block mb-3">
+                            <i class="fa fa-graduation-cap fa-3x text-secondary"></i>
+                        </a>
+                        <p class="card-text display-6 fw-bold">{{cgpa_count}}</p>
+                        <button type="button" class="btn btn-warning btn-lg mt-2">CGPA</button>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- Card 3 -->
+            <div class="col">
+                <div class="card h-100 shadow-lg border-0 rounded-4">
+                    <div class="card-body text-center">
+                        <a href="#" class="d-block mb-3">
+                            <i class="fa fa-tasks fa-3x text-secondary"></i>
+                        </a>
+                        <p class="card-text display-6 fw-bold">{{program_count}}</p>
+                        <button type="button" class="btn btn-danger btn-lg mt-2">PROGRAM</button>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- Card 4 -->
+            <div class="col">
+                <div class="card h-100 shadow-lg border-0 rounded-4">
+                    <div class="card-body text-center">
+                        <a href="#" class="d-block mb-3">
+                            <i class="fa-solid fa-droplet fa-3x text-secondary"></i>
+                        </a>
+                        <p class="card-text display-6 fw-bold">{{blood_count}}</p>
+                        <button type="button" class="btn btn-primary btn-lg mt-2">BLOOD</button> 
+                    </div>
+                </div>
+            </div>
+    
+            <!-- Card 5 -->
+            <div class="col">
+                <div class="card h-100 shadow-lg border-0 rounded-4">
+                    <div class="card-body text-center">
+                        <a href="#" class="d-block mb-3">
+                            <i class="fa-solid fa-person fa-3x text-secondary"></i>  
+                        </a>
+                        <p class="card-text display-6 fw-bold">{{sex_count}}</p>
+                        <button type="button" class="btn btn-success btn-lg mt-2">SEX</button>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- Card 6 -->
+            <div class="col">
+                <div class="card h-100 shadow-lg border-0 rounded-4">
+                    <div class="card-body text-center">
+                        <a href="#" class="d-block mb-3">
+                            <i class="fa-solid fa-envelope fa-3x text-secondary"></i>   
+                        </a>
+                        <p class="card-text display-6 fw-bold">{{email_count}}</p>
+                        <button type="button" class="btn btn-secondary btn-lg mt-2">EMAIL</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Gender Distribution</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="sexChart" width="400" height="400"></canvas>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Distribution of Blood Types</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="bloodTypeChart" width="400" height="400"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // Sex graph show
+    // Data passed from FastAPI to JavaScript
+    const maleCount = {{ male_count }};
+    const femaleCount = {{ female_count }};
+    
+    // Chart.js setup for sex chart
+    let sexCtx = document.getElementById('sexChart').getContext('2d');
+    new Chart(sexCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Male', 'Female'],
+            datasets: [{
+                label: 'Gender Distribution',
+                data: [maleCount, femaleCount],
+                backgroundColor: ['#36A2EB', '#FF6384'],
+                hoverBackgroundColor: ['#36A2EB', '#FF6384']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Gender Distribution of Users'
+                }
+            }
+        }
+    });
+    
+    // Blood graph show
+    // Data passed from FastAPI to JavaScript
+    const bloodCounts = {{ blood_counts | tojson }};
+    
+    // Chart.js setup for blood type chart
+    const bloodCtx = document.getElementById('bloodTypeChart').getContext('2d');
+    new Chart(bloodCtx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(bloodCounts),
+            datasets: [{
+                label: 'Blood Type Count',
+                data: Object.values(bloodCounts),
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                    '#9966FF', '#FF9F40', '#66FF66', '#FF6666'
+                ],
+                borderColor: '#ddd',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Distribution of Blood Types'
+                }
+            },
+            scales: {
+                x: { // Ensures that the x-axis is defined
+                    title: {
+                        display: true,
+                        text: 'Blood Types'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    },
+                    ticks: {
+                        stepSize: 1  // Adjust this based on your data
+                    }
+                }
+            }
+        }
+    });
+    </script>
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
 </div>
 {% endblock %}
