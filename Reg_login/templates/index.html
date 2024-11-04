@@ -1,0 +1,163 @@
+{% include 'dashboard_sidebar.html' %}
+{% block content %}
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+        }
+        .error {
+            color: red;
+        }
+        .loading {
+            display: none;
+        }
+        .highlight {
+            color: red;
+        }
+        .pagination {
+            justify-content: center;
+        }
+    </style>
+<div class="content">
+<div class="container">
+    <h1 class="text-center">Website Heading Scanner</h1>
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form id="scanForm">
+        <div class="form-group">
+            <label for="urlInput">Enter Website URL:</label>
+            <input type="url" class="form-control" id="urlInput" name="url" placeholder="https://example.com" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Start Scan</button>
+    </form>
+    
+    <h2 class="mt-4">Scanned Headings</h2>
+    <div class="loading text-center" id="loadingMessage">Scanning... Please wait.</div>
+    
+    <div class="form-group">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search headings...">
+    </div>
+    
+    <table class="table table-bordered mt-2" id="resultsTable">
+        <thead class="thead-light">
+            <tr>
+                <th>URL</th>
+                <th>Tag Type</th>
+                <th>Content</th>
+            </tr>
+        </thead>
+        <tbody id="resultsBody">
+            <!-- Results will be populated here -->
+        </tbody>
+    </table>
+    
+    <nav aria-label="Page navigation">
+        <ul class="pagination" id="pagination">
+            <!-- Pagination will be populated here -->
+        </ul>
+    </nav>
+</div>
+</div>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+    let allHeadings = [];
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    
+    document.getElementById('scanForm').addEventListener('submit', async function(event) {
+        event.preventDefault(); // Prevent the default form submission
+    
+        const url = document.getElementById('urlInput').value;
+        const loadingMessage = document.getElementById('loadingMessage');
+        loadingMessage.style.display = 'block'; // Show loading message
+    
+        try {
+            // Fetch the headings from your backend
+            const response = await fetch('/scan/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url: url })
+            });
+    
+            // After fetching the response, immediately update the table
+            if (response.ok) {
+                const data = await response.json();
+                allHeadings = data.headings;  // Store and display latest results
+                updateResultsTable(allHeadings);
+                setupPagination(allHeadings.length);
+            } else {
+                const errorData = await response.json(); // Get the error response
+                alert(`Error: ${errorData.error || 'Failed to fetch headings.'}`);
+            }
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            alert('Failed to fetch headings. Please try again.');
+        } finally {
+            loadingMessage.style.display = 'none'; // Hide loading message
+        }
+    });
+
+    function updateResultsTable(headings) {
+        const resultsBody = document.getElementById('resultsBody');
+        resultsBody.innerHTML = ''; // Clear previous results
+
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const paginatedHeadings = headings.slice(start, end);
+
+        paginatedHeadings.forEach(heading => {
+            const row = document.createElement('tr');
+            const tagTypeClass = heading.tag_type === 'h1' || heading.tag_type === 'h2' ? 'highlight' : '';
+            row.innerHTML = `
+                <td>${heading.url}</td>
+                <td class="${tagTypeClass}">${heading.tag_type}</td>
+                <td class="${tagTypeClass}">${heading.content}</td>
+            `;
+            resultsBody.appendChild(row);
+        });
+    }
+
+    function setupPagination(totalItems) {
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = ''; // Clear previous pagination
+
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        
+        for (let i = 1; i <= totalPages; i++) {
+            const pageItem = document.createElement('li');
+            pageItem.className = 'page-item';
+            pageItem.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+            pagination.appendChild(pageItem);
+        }
+
+        // Add event listener for pagination links
+        document.querySelectorAll('.page-link').forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                currentPage = parseInt(this.getAttribute('data-page'));
+                updateResultsTable(allHeadings);
+            });
+        });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const filteredHeadings = allHeadings.filter(heading => 
+            heading.content.toLowerCase().includes(searchTerm) ||
+            heading.url.toLowerCase().includes(searchTerm)
+        );
+
+        currentPage = 1; // Reset to first page on search
+        updateResultsTable(filteredHeadings);
+        setupPagination(filteredHeadings.length);
+    });
+
+</script>
+
+{% endblock %}

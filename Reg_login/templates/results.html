@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Audit Results</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/modern-css-reset/1.4.0/reset.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border: 1px solid #ddd; }
+        th { background-color: #f4f4f4; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>SEO Audit Tool</h1>
+    <form action="/audit/" method="post">
+        <label for="url">Enter URL for SEO Audit:</label><br>
+        <input type="url" id="url" name="url" placeholder="https://example.com" required>
+        <button type="submit">Run Audit</button>
+    </form>
+
+    <br><br>
+    <h2>SEO Audit Results for <span id="urlDisplay">{{ url }}</span></h2>
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th>URL</th>
+                <th>Category</th>
+                <th>Issue</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>{{ result.url }}</td>
+                <td>{{ result.category }}</td>
+                <td>{{ result.issue }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $("#resultsTable").DataTable({
+                paging: true,
+                searching: true,
+                ordering: true,
+            });
+        });
+    </script>
+</body>
+</html>

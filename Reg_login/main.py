@@ -17,13 +17,27 @@ from database import engine
 from models import Base
 from datetime import datetime
 from fastapi import FastAPI, Depends, HTTPException, Form
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
-from fastapi.templating import Jinja2Templates
 from fastapi import Request
-
-# Initialize FastAPI app
+from bs4 import BeautifulSoup
+import requests
+from urllib.parse import urljoin, urlparse
+import re
+from database import SessionLocal  
+from models import Heading
+from models import SEOResult
+from models import BlogPost
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 secret_key = os.getenv("SECRET_KEY", "fallback_dev_key_for_local")
 app.add_middleware(SessionMiddleware, secret_key="secret_key")
@@ -223,3 +237,136 @@ async def update_user(user_id: int, username: str = Form(...), email: str = Form
             else:
                 raise HTTPException(status_code=500, detail="Database is currently busy. Please try again later.")
 
+def scan_website(url, db: Session, visited=set()):
+    if url in visited:
+        return
+    visited.add(url)
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Could not access {url}: {e}")
+        return
+    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Collect headings from the current page
+    for tag in soup.find_all(['h1', 'h2']):
+        heading = Heading(url=url, tag_type=tag.name, content=tag.get_text(strip=True))
+        db.add(heading)
+    
+    # Commit the headings to the database
+    db.commit()
+
+# Route to show the form and display headings
+@app.get("/index")
+def index(request: Request, db: Session = Depends(get_db)):
+    headings = db.query(Heading).all()
+    return templates.TemplateResponse("index.html", {"request": request, "headings": headings})
+
+# Route to start scanning a website from the form submission
+@app.post("/scan/")
+async def scan(request: Request, db: Session = Depends(get_db)):
+    request_body = await request.json()
+    url = request_body.get('url')
+    
+    if not re.match(r'^https?://', url):
+        return {"error": "Invalid URL format"}
+
+    scan_website(url, db)  # Store new headings
+
+    # Retrieve and return updated headings from the database
+    headings = db.query(Heading).filter(Heading.url == url).all()
+    headings_data = [{"url": h.url, "tag_type": h.tag_type, "content": h.content} for h in headings]
+    return {"headings": headings_data}
+
+
+class AuditRequest(BaseModel):
+    url: str
+
+def crawl_page(url):
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        return BeautifulSoup(response.text, 'html.parser')
+    except requests.exceptions.RequestException as e:
+        print(f"Error crawling {url}: {e}")
+        return None
+
+# SEO checks
+def check_meta_title(soup, url):
+    title = soup.title.string if soup.title else None
+    if not title:
+        return {"category": "Meta Data", "url": url, "issue": "Missing Meta Title"}
+    return None
+
+def check_meta_description(soup, url):
+    description = soup.find('meta', {'name': 'description'})
+    if not description or not description.get("content"):
+        return {"category": "Meta Data", "url": url, "issue": "Missing Meta Description"}
+    return None
+
+def process_page(url, db: Session):
+    soup = crawl_page(url)
+    if not soup:
+        return []
+    
+    results = [check_meta_title(soup, url), check_meta_description(soup, url)]
+    return list(filter(None, results))
+
+# Endpoint to audit a page
+@app.post("/audit/")
+def audit_page(audit_request: AuditRequest, db: Session = Depends(SessionLocal)):
+    url = audit_request.url
+    parsed_url = urlparse(url)
+    if not parsed_url.scheme or not parsed_url.netloc:
+        raise HTTPException(status_code=400, detail="Invalid URL")
+
+    db.query(SEOResult).filter(SEOResult.url == url).delete()
+
+    audit_results = process_page(url, db)
+    for result in audit_results:
+        db_result = SEOResult(**result)
+        db.add(db_result)
+    
+    db.commit()
+    return {"message": "Audit completed", "url": url}
+
+# Endpoint to get audit results in JSON format
+@app.get("/results/", response_model=list[dict])
+def get_results_as_json(url: str, db: Session = Depends(SessionLocal)):
+    results = db.query(SEOResult).filter(SEOResult.url == url).all()
+    if not results:
+        raise HTTPException(status_code=404, detail="No results found")
+    return [{"url": result.url, "category": result.category, "issue": result.issue} for result in results]
+
+@app.get("/results/{url}", response_class=HTMLResponse)
+def display_results_page(request: Request, url: str, db: Session = Depends(SessionLocal)):
+    # Fetch audit results for the given URL
+    results = db.query(SEOResult).filter(SEOResult.url == url).all()
+    if not results:
+        raise HTTPException(status_code=404, detail="No results found")
+
+    # Render the template with the results
+    return templates.TemplateResponse("results.html", {"request": request, "url": url, "results": results})
+
+@app.get("/create_post")
+async def create_form(request: Request):
+    return templates.TemplateResponse("create_post.html", {"request": request})
+
+@app.post("/create_post")
+async def create_post(
+    title: str = Form(...), 
+    content: str = Form(...), 
+    db: Session = Depends(get_db)
+):
+    new_post = BlogPost(title=title, content=content)
+    db.add(new_post)
+    db.commit()
+    return RedirectResponse("/show_post", status_code=303)
+
+@app.get("/show_post")
+async def show_post(request: Request, db: Session = Depends(get_db)):
+    posts = db.query(BlogPost).all()
+    return templates.TemplateResponse("show_post.html", {"request": request, "posts": posts})
